@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="id" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Target Tabungan Cloud</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+
+  <div class="max-w-3xl mx-auto space-y-6">
+    
+    <!-- Status Cloud Bar -->
+    <div class="bg-slate-800/90 px-4 py-3 rounded-xl border border-slate-700 flex flex-wrap justify-between items-center gap-2">
+      <div class="flex items-center space-x-2">
+        <span id="cloudDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+        <span id="cloudStatusText" class="text-xs font-medium text-slate-300">Mode Lokal (Cloud belum diatur)</span>
+      </div>
+      <div class="flex space-x-2">
+        <button onclick="syncFromCloud()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition">
+          🔄 Refresh Cloud
+        </button>
+        <button onclick="toggleCloudModal()" class="text-xs bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg transition font-medium">
+          ☁️ Hubungkan Cloud
+        </button>
+      </div>
+    </div>
+
+    <!-- Pengaturan URL Cloud (Hidden by default) -->
+    <div id="cloudModal" class="hidden bg-slate-800 p-5 rounded-2xl shadow-lg border border-indigo-500/50 space-y-3">
+      <h3 class="text-sm font-bold text-indigo-400">☁️ Pengaturan URL Google Apps Script</h3>
+      <p class="text-xs text-slate-400">Tempel URL Web App (berakhiran <code>/exec</code>) dari Google Apps Script kamu di bawah ini. Cukup diatur satu kali di laptop dan satu kali di HP.</p>
+      <input type="url" id="cloudUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-sm" />
+      <div class="flex justify-end space-x-2">
+        <button onclick="toggleCloudModal()" class="text-xs bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg">Batal</button>
+        <button onclick="saveCloudUrl()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 py-2 rounded-lg">Simpan &amp; Sinkronkan</button>
+      </div>
+    </div>
+
+    <!-- Header & Target Setup -->
+    <div class="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold text-emerald-400">🎯 Target Barang</h1>
+        <button onclick="toggleSetup()" class="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition">
+          ⚙️ Atur Target
+        </button>
+      </div>
+
+      <!-- Form Setup Target -->
+      <div id="setupForm" class="hidden space-y-4 mb-6 pb-6 border-b border-slate-700">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="text-xs text-slate-400">Nama Barang</label>
+            <input type="text" id="itemNameInput" placeholder="Contoh: Lensa Kamera / Gadget" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700 text-white" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Harga Barang (Rp)</label>
+            <input type="number" id="targetAmountInput" placeholder="3500000" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700 text-white" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Target Tanggal Beli</label>
+            <input type="date" id="deadlineInput" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700 text-white" />
+          </div>
+        </div>
+        <button onclick="saveTarget()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition">
+          Simpan Target ke Cloud
+        </button>
+      </div>
+
+      <!-- Display Target Info -->
+      <div class="space-y-4">
+        <div class="flex flex-col md:flex-row md:justify-between md:items-end gap-2">
+          <div>
+            <p class="text-sm text-slate-400">Menabung untuk:</p>
+            <h2 id="displayItemName" class="text-xl font-bold text-white">Belum ada target</h2>
+          </div>
+          <div class="text-left md:text-right">
+            <span id="displayCurrent" class="text-2xl font-extrabold text-emerald-400">Rp 0</span>
+            <span class="text-slate-400 text-sm"> / <span id="displayTarget">Rp 0</span></span>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full bg-slate-900 rounded-full h-4 overflow-hidden border border-slate-700">
+          <div id="progressBar" class="bg-emerald-500 h-4 transition-all duration-500" style="width: 0%"></div>
+        </div>
+
+        <!-- Smart Recommendations -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+            <p class="text-xs text-slate-400">Progress</p>
+            <p id="displayPercent" class="text-lg font-bold text-white">0%</p>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+            <p class="text-xs text-slate-400">Kurang</p>
+            <p id="displayRemaining" class="text-lg font-bold text-rose-400">Rp 0</p>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+            <p class="text-xs text-slate-400">Rekomendasi / Hari</p>
+            <p id="displayDaily" class="text-lg font-bold text-amber-400">Rp 0</p>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/60">
+            <p class="text-xs text-slate-400">Rekomendasi / Minggu</p>
+            <p id="displayWeekly" class="text-lg font-bold text-sky-400">Rp 0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Transaksi -->
+    <div class="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+      <h3 class="text-lg font-bold mb-4">➕ Catat Tabungan</h3>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <select id="txType" class="p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white">
+          <option value="in">🟢 Setor Tabungan (+)</option>
+          <option value="out">🔴 Pakai Darurat (-)</option>
+        </select>
+        <input type="number" id="txAmount" placeholder="Nominal (Rp)" class="p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white" />
+        <input type="text" id="txNote" placeholder="Catatan (misal: Sisa uang saku)" class="p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white" />
+        <button onclick="addTransaction()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-lg transition">
+          Tambah
+        </button>
+      </div>
+    </div>
+
+    <!-- Riwayat Transaksi -->
+    <div class="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold">📜 Riwayat Transaksi</h3>
+        <span id="txCount" class="text-xs text-slate-400">0 catatan</span>
+      </div>
+      <div id="txList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+    </div>
+
+  </div>
+
+  <script>
+  //<![CDATA[
+    let cloudUrl = localStorage.getItem('savingCloudUrl') || '';
+    let state = JSON.parse(localStorage.getItem('savingSystemData')) || {
+      itemName: 'Barang Impian',
+      targetAmount: 0,
+      deadline: '',
+      transactions: []
+    };
+
+    const formatRp = (num) => 'Rp ' + Number(num).toLocaleString('id-ID');
+
+    function setCloudStatus(status, message) {
+      const dot = document.getElementById('cloudDot');
+      const text = document.getElementById('cloudStatusText');
+      text.textContent = message;
+      dot.className = 'w-2.5 h-2.5 rounded-full ';
+      if (status === 'online') dot.className += 'bg-emerald-400';
+      else if (status === 'syncing') dot.className += 'bg-sky-400 animate-pulse';
+      else if (status === 'error') dot.className += 'bg-rose-500';
+      else dot.className += 'bg-amber-400';
+    }
+
+    function toggleCloudModal() {
+      const modal = document.getElementById('cloudModal');
+      modal.classList.toggle('hidden');
+      document.getElementById('cloudUrlInput').value = cloudUrl;
+    }
+
+    async function saveCloudUrl() {
+      const inputUrl = document.getElementById('cloudUrlInput').value.trim();
+      if (!inputUrl) {
+        localStorage.removeItem('savingCloudUrl');
+        cloudUrl = '';
+        setCloudStatus('local', 'Mode Lokal (Cloud belum diatur)');
+        toggleCloudModal();
+        return;
+      }
+      cloudUrl = inputUrl;
+      localStorage.setItem('savingCloudUrl', cloudUrl);
+      toggleCloudModal();
+      await syncFromCloud();
+    }
+
+    async function syncFromCloud() {
+      if (!cloudUrl) {
+        setCloudStatus('local', 'Mode Lokal (Klik "Hubungkan Cloud" untuk sinkron otomatis)');
+        return;
+      }
+      setCloudStatus('syncing', 'Mengambil data dari Cloud...');
+      try {
+        const res = await fetch(cloudUrl + '?t=' + Date.now());
+        const json = await res.json();
+        if (json.status === 'success' && json.data) {
+          // Jika data di cloud masih kosong tapi di lokal sudah ada isinya, kirim data lokal ke cloud
+          if (json.data.targetAmount === 0 && json.data.transactions.length === 0 && (state.targetAmount > 0 || state.transactions.length > 0)) {
+            await pushToCloud();
+          } else {
+            state = json.data;
+            localStorage.setItem('savingSystemData', JSON.stringify(state));
+            renderUI();
+            setCloudStatus('online', 'Tersinkronisasi dengan Google Cloud');
+          }
+        }
+      } catch (err) {
+        setCloudStatus('error', 'Gagal memuat Cloud (Data disimpan di perangkat)');
+      }
+    }
+
+    async function pushToCloud() {
+      localStorage.setItem('savingSystemData', JSON.stringify(state));
+      renderUI();
+
+      if (!cloudUrl) return;
+      setCloudStatus('syncing', 'Menyimpan ke Cloud...');
+      try {
+        const res = await fetch(cloudUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(state)
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+          setCloudStatus('online', 'Tersimpan otomatis di Cloud');
+        } else {
+          setCloudStatus('error', 'Gagal simpan ke Cloud');
+        }
+      } catch (err) {
+        setCloudStatus('error', 'Offline / Gagal terhubung ke Cloud');
+      }
+    }
+
+    function toggleSetup() {
+      const form = document.getElementById('setupForm');
+      form.classList.toggle('hidden');
+      document.getElementById('itemNameInput').value = state.itemName;
+      document.getElementById('targetAmountInput').value = state.targetAmount || '';
+      document.getElementById('deadlineInput').value = state.deadline;
+    }
+
+    function saveTarget() {
+      state.itemName = document.getElementById('itemNameInput').value || 'Barang Impian';
+      state.targetAmount = Number(document.getElementById('targetAmountInput').value) || 0;
+      state.deadline = document.getElementById('deadlineInput').value;
+      document.getElementById('setupForm').classList.add('hidden');
+      pushToCloud();
+    }
+
+    function addTransaction() {
+      const type = document.getElementById('txType').value;
+      const amount = Number(document.getElementById('txAmount').value);
+      const note = document.getElementById('txNote').value || (type === 'in' ? 'Setor tabungan' : 'Penarikan');
+
+      if (!amount || amount <= 0) return alert('Masukkan nominal yang valid!');
+
+      state.transactions.unshift({
+        id: Date.now(),
+        date: new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
+        type: type,
+        amount: amount,
+        note: note
+      });
+
+      document.getElementById('txAmount').value = '';
+      document.getElementById('txNote').value = '';
+      pushToCloud();
+    }
+
+    function deleteTx(id) {
+      state.transactions = state.transactions.filter(function(t) { return t.id !== id; });
+      pushToCloud();
+    }
+
+    function renderUI() {
+      const current = state.transactions.reduce(function(acc, t) {
+        return t.type === 'in' ? acc + t.amount : acc - t.amount;
+      }, 0);
+      const remaining = Math.max(state.targetAmount - current, 0);
+      const percent = state.targetAmount > 0 ? Math.min(Math.round((current / state.targetAmount) * 100), 100) : 0;
+
+      document.getElementById('displayItemName').textContent = state.itemName;
+      document.getElementById('displayCurrent').textContent = formatRp(current);
+      document.getElementById('displayTarget').textContent = formatRp(state.targetAmount);
+      document.getElementById('progressBar').style.width = percent + '%';
+      document.getElementById('displayPercent').textContent = percent + '%';
+      document.getElementById('displayRemaining').textContent = formatRp(remaining);
+      document.getElementById('txCount').textContent = state.transactions.length + ' catatan';
+
+      if (state.deadline && remaining > 0) {
+        const daysLeft = Math.max(Math.ceil((new Date(state.deadline) - new Date()) / (1000 * 60 * 60 * 24)), 1);
+        const weeksLeft = Math.max(daysLeft / 7, 1);
+        document.getElementById('displayDaily').textContent = formatRp(Math.ceil(remaining / daysLeft));
+        document.getElementById('displayWeekly').textContent = formatRp(Math.ceil(remaining / weeksLeft));
+      } else {
+        document.getElementById('displayDaily').textContent = 'Rp 0';
+        document.getElementById('displayWeekly').textContent = 'Rp 0';
+      }
+
+      const listEl = document.getElementById('txList');
+      if (state.transactions.length === 0) {
+        listEl.innerHTML = '<p class="text-sm text-slate-500 italic">Belum ada catatan tabungan.</p>';
+      } else {
+        listEl.innerHTML = state.transactions.map(function(t) {
+          return '<div class="flex justify-between items-center bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">' +
+            '<div>' +
+              '<p class="font-medium text-sm text-white">' + t.note + '</p>' +
+              '<p class="text-xs text-slate-400">' + t.date + '</p>' +
+            '</div>' +
+            '<div class="flex items-center space-x-3">' +
+              '<span class="font-bold text-sm ' + (t.type === 'in' ? 'text-emerald-400' : 'text-rose-400') + '">' +
+                (t.type === 'in' ? '+ ' : '- ') + formatRp(t.amount) +
+              '</span>' +
+              '<button onclick="deleteTx(' + t.id + ')" class="text-slate-500 hover:text-rose-400 text-xs">✖</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+    }
+
+    if (state.targetAmount === 0) document.getElementById('setupForm').classList.remove('hidden');
+    renderUI();
+    syncFromCloud();
+  //]]>
+  </script>
+</body>
+</html>
